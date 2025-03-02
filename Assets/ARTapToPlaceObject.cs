@@ -1,22 +1,23 @@
 using UnityEngine;
 using UnityEngine.XR.ARFoundation;
 using UnityEngine.XR.ARSubsystems;
+using System;
 using System.Collections;
 using System.Collections.Generic;
-using System;
 using UnityEngine.InputSystem;
-
 
 public class ARTapToPlaceObject : MonoBehaviour
 {
     public GameObject placementIndicator;
+    public GameObject objectToPlace;  // Added missing declaration for the object to instantiate
+
     public ARRaycastManager raycastManager;
     private bool placementPoseIsValid = false;
     private Pose placementPose;
 
     private PlayerInput playerInput;
     private InputAction touchAction;
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+
     void Start()
     {
         raycastManager = FindObjectOfType<ARRaycastManager>();
@@ -24,12 +25,14 @@ public class ARTapToPlaceObject : MonoBehaviour
 
     void Awake()
     {
-        playerInput = new GetComponent<PlayerInput>();
+        // Corrected usage of GetComponent (removed 'new')
+        playerInput = GetComponent<PlayerInput>();
         touchAction = playerInput.actions.FindAction("SingleTouchClick");
     }
 
     void OnEnable()
     {
+        // Subscribe with an overload that accepts InputAction.CallbackContext
         touchAction.started += PlaceObject;
     }
 
@@ -48,7 +51,6 @@ public class ARTapToPlaceObject : MonoBehaviour
         if (placementPoseIsValid)
         {
             placementPose = hits[0].pose;
-            
         }
     }
 
@@ -65,6 +67,12 @@ public class ARTapToPlaceObject : MonoBehaviour
         }
     }
 
+    // Overload to match the InputAction delegate signature
+    private void PlaceObject(InputAction.CallbackContext context)
+    {
+        PlaceObject();
+    }
+
     private void PlaceObject()
     {
         if (!placementPoseIsValid)
@@ -75,13 +83,13 @@ public class ARTapToPlaceObject : MonoBehaviour
         Instantiate(objectToPlace, placementPose.position, placementPose.rotation);
     }
 
-    // Update is called once per frame
     void Update()
     {
         UpdatePlacementPose();
         UpdatePlacementIndicator();
 
-        if (placementPoseIsValid && Input.touchCount > 0 && Input.GetTouch(0).phase == TouchPhase.Began)
+        // Use explicit namespace to resolve TouchPhase ambiguity
+        if (placementPoseIsValid && Input.touchCount > 0 && Input.GetTouch(0).phase == UnityEngine.TouchPhase.Began)
         {
             PlaceObject();
         }
