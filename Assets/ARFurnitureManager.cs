@@ -4,7 +4,7 @@ using UnityEngine.XR.ARSubsystems;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
-using TMPro; // Added for TMP Dropdown support
+using TMPro; // Import TextMeshPro namespace
 
 public class ARFurnitureManager : MonoBehaviour
 {
@@ -16,6 +16,9 @@ public class ARFurnitureManager : MonoBehaviour
     public GameObject selectedFurniturePrefab;
     public bool isDeleteMode = false;
 
+    [Header("UI References")]
+    public TMP_Dropdown modeDropdown; // Reference to your TMP Dropdown
+
     private Pose placementPose;
     private bool placementPoseIsValid = false;
     private List<GameObject> placedFurniture = new List<GameObject>();
@@ -26,6 +29,18 @@ public class ARFurnitureManager : MonoBehaviour
     void Start()
     {
         arRaycastManager = FindObjectOfType<ARRaycastManager>();
+
+        // Subscribe to the TMP Dropdown's value-changed event programmatically
+        if (modeDropdown != null)
+        {
+            modeDropdown.onValueChanged.AddListener(OnModeDropdownValueChanged);
+            // Set initial mode based on current dropdown value
+            OnModeDropdownValueChanged(modeDropdown.value);
+        }
+        else
+        {
+            Debug.LogWarning("Mode Dropdown not assigned in Inspector!");
+        }
     }
 
     void Awake()
@@ -79,7 +94,6 @@ public class ARFurnitureManager : MonoBehaviour
     {
         Vector2 touchPosition = Vector2.zero;
 
-        // Read touch position correctly based on the control's value type
         if (context.control.valueType == typeof(Vector2))
         {
             touchPosition = context.ReadValue<Vector2>();
@@ -98,7 +112,7 @@ public class ARFurnitureManager : MonoBehaviour
 
         Debug.Log("Tap detected at: " + touchPosition);
 
-        // Check if the tap is over a UI element
+        // Use our custom UI check to ignore taps over UI elements
         if (IsPointerOverUI(touchPosition))
         {
             Debug.Log("Tap is over UI, ignoring.");
@@ -150,11 +164,9 @@ public class ARFurnitureManager : MonoBehaviour
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
             Debug.Log("Raycast hit: " + hit.collider.gameObject.name);
-
-            // First, check if the hit object is tagged as "Furniture"
             GameObject target = hit.collider.gameObject;
 
-            // If not, check if the parent object is tagged as "Furniture"
+            // If the hit object is not directly tagged, check its parent
             if (!target.CompareTag("Furniture") && target.transform.parent != null)
             {
                 if (target.transform.parent.CompareTag("Furniture"))
@@ -194,12 +206,10 @@ public class ARFurnitureManager : MonoBehaviour
         }
     }
 
-    // Called by the UI (TMP Dropdown) to toggle deletion mode
-    // TMP Dropdown option index 0: "MODE: Add", index 1: "MODE: Delete"
-    public void OnModeDropdownValueChanged(int modeIndex)
+    // Callback for TMP Dropdown value change; no parameter needs to be entered in the Inspector
+    private void OnModeDropdownValueChanged(int modeIndex)
     {
         Debug.Log("Dropdown changed! New mode index: " + modeIndex);
-
         if (modeIndex == 0)
         {
             SetDeleteMode(false);
@@ -216,7 +226,7 @@ public class ARFurnitureManager : MonoBehaviour
         }
     }
 
-    // Called to set the delete mode flag
+    // Sets the delete mode flag
     public void SetDeleteMode(bool value)
     {
         isDeleteMode = value;
