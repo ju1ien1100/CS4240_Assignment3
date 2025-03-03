@@ -4,7 +4,7 @@ using UnityEngine.XR.ARSubsystems;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
-using TMPro; // Import TextMeshPro namespace
+using TMPro;
 
 public class ARFurnitureManager : MonoBehaviour
 {
@@ -14,14 +14,22 @@ public class ARFurnitureManager : MonoBehaviour
 
     [Header("Furniture Settings")]
     public GameObject selectedFurniturePrefab;
-    public bool isDeleteMode = false;
 
     [Header("UI References")]
     public TMP_Dropdown modeDropdown; // Reference to your TMP Dropdown
 
+    // Mode flags: In Add mode both isDeleteMode and isMoveMode are false.
+    // In Delete mode, isDeleteMode is true.
+    // In Move mode, isMoveMode is true.
+    private bool isDeleteMode = false;
+    private bool isMoveMode = false;
+
     private Pose placementPose;
     private bool placementPoseIsValid = false;
     private List<GameObject> placedFurniture = new List<GameObject>();
+
+    // The furniture currently being moved (if any)
+    private GameObject movingObject = null;
 
     private PlayerInput playerInput;
     private InputAction touchAction;
@@ -30,16 +38,16 @@ public class ARFurnitureManager : MonoBehaviour
     {
         arRaycastManager = FindObjectOfType<ARRaycastManager>();
 
-        // Subscribe to the TMP Dropdown's value-changed event programmatically
+        // Programmatically subscribe to the TMP Dropdown's value-changed event.
         if (modeDropdown != null)
         {
             modeDropdown.onValueChanged.AddListener(OnModeDropdownValueChanged);
-            // Set initial mode based on current dropdown value
+            // Set initial mode based on the current dropdown value.
             OnModeDropdownValueChanged(modeDropdown.value);
         }
         else
         {
-            Debug.LogWarning("Mode Dropdown not assigned in Inspector!");
+            Debug.LogWarning("Mode Dropdown not assigned!");
         }
     }
 
@@ -63,6 +71,14 @@ public class ARFurnitureManager : MonoBehaviour
     {
         UpdatePlacementPose();
         UpdatePlacementIndicator();
+
+        // If in Move mode and an object is currently being moved,
+        // update its position to match the placement pose.
+        if (isMoveMode && movingObject != null && placementPoseIsValid)
+        {
+            movingObject.transform.position = placementPose.position;
+            movingObject.transform.rotation = placementPose.rotation;
+        }
     }
 
     void UpdatePlacementPose()
@@ -93,7 +109,6 @@ public class ARFurnitureManager : MonoBehaviour
     private void OnTap(InputAction.CallbackContext context)
     {
         Vector2 touchPosition = Vector2.zero;
-
         if (context.control.valueType == typeof(Vector2))
         {
             touchPosition = context.ReadValue<Vector2>();
@@ -109,28 +124,56 @@ public class ARFurnitureManager : MonoBehaviour
                 Debug.LogWarning("No touchscreen device found.");
             }
         }
-
         Debug.Log("Tap detected at: " + touchPosition);
 
-        // Use our custom UI check to ignore taps over UI elements
+        // Check if the tap is over a UI element.
         if (IsPointerOverUI(touchPosition))
         {
             Debug.Log("Tap is over UI, ignoring.");
             return;
         }
 
-        // Process the tap based on the current mode
-        if (isDeleteMode)
+        // Process the tap based on the current mode.
+        if (isMoveMode)
+        {
+            // If no object is currently moving, try to select one.
+            if (movingObject == null)
+            {
+                // Look for a placed furniture object near the placement indicator.
+                // Adjust the threshold distance as needed.
+                float threshold = 0.2f;
+                foreach (GameObject obj in placedFurniture)
+                {
+                    if (Vector3.Distance(obj.transform.position, placementPose.position) < threshold)
+                    {
+                        movingObject = obj;
+                        Debug.Log("Object selected for moving: " + obj.name);
+                        break;
+                    }
+                }
+                if (movingObject == null)
+                {
+                    Debug.Log("No object found near the placement indicator to move.");
+                }
+            }
+            else
+            {
+                // Object is currently moving; place it at the current location.
+                Debug.Log("Placing moved object: " + movingObject.name);
+                movingObject = null;
+            }
+        }
+        else if (isDeleteMode)
         {
             TryDeleteFurniture(touchPosition);
         }
-        else
+        else // Add mode
         {
             PlaceFurniture();
         }
     }
 
-    // Custom function to determine if a screen point is over a UI element
+    // Custom function to determine if a screen point is over a UI element.
     private bool IsPointerOverUI(Vector2 screenPosition)
     {
         PointerEventData pointerEventData = new PointerEventData(EventSystem.current)
@@ -142,7 +185,7 @@ public class ARFurnitureManager : MonoBehaviour
         return raycastResults.Count > 0;
     }
 
-    // Places the selected furniture at the current valid placement pose
+    // Instantiates a new furniture object at the placement pose.
     void PlaceFurniture()
     {
         if (!placementPoseIsValid || selectedFurniturePrefab == null)
@@ -150,14 +193,13 @@ public class ARFurnitureManager : MonoBehaviour
             Debug.Log("Cannot place furniture: invalid placement pose or no furniture selected.");
             return;
         }
-
         GameObject furniture = Instantiate(selectedFurniturePrefab, placementPose.position, placementPose.rotation);
-        furniture.tag = "Furniture"; // Tag the furniture for deletion
+        furniture.tag = "Furniture"; // Tag the furniture for deletion/movement.
         placedFurniture.Add(furniture);
         Debug.Log("Furniture placed: " + furniture.name);
     }
 
-    // Uses a raycast from the screen position to delete a furniture object, if hit.
+    // Uses a raycast from the screen position to delete a furniture object if hit.
     void TryDeleteFurniture(Vector2 screenPosition)
     {
         Ray ray = Camera.current.ScreenPointToRay(screenPosition);
@@ -165,8 +207,6 @@ public class ARFurnitureManager : MonoBehaviour
         {
             Debug.Log("Raycast hit: " + hit.collider.gameObject.name);
             GameObject target = hit.collider.gameObject;
-
-            // If the hit object is not directly tagged, check its parent
             if (!target.CompareTag("Furniture") && target.transform.parent != null)
             {
                 if (target.transform.parent.CompareTag("Furniture"))
@@ -174,7 +214,6 @@ public class ARFurnitureManager : MonoBehaviour
                     target = target.transform.parent.gameObject;
                 }
             }
-
             if (target.CompareTag("Furniture"))
             {
                 placedFurniture.Remove(target);
@@ -192,7 +231,7 @@ public class ARFurnitureManager : MonoBehaviour
         }
     }
 
-    // Called by the UI to update the selected furniture prefab
+    // Called by the UI to update the selected furniture prefab.
     public void SetSelectedFurniture(GameObject furniturePrefab)
     {
         if (furniturePrefab != null)
@@ -206,29 +245,33 @@ public class ARFurnitureManager : MonoBehaviour
         }
     }
 
-    // Callback for TMP Dropdown value change; no parameter needs to be entered in the Inspector
+    // Callback for TMP Dropdown value change.
+    // The dropdown options should be ordered as follows:
+    // 0: "MODE: Add"  1: "MODE: Delete"  2: "MODE: Move"
     private void OnModeDropdownValueChanged(int modeIndex)
     {
         Debug.Log("Dropdown changed! New mode index: " + modeIndex);
         if (modeIndex == 0)
         {
-            SetDeleteMode(false);
+            isDeleteMode = false;
+            isMoveMode = false;
             Debug.Log("Mode changed to: ADD");
         }
         else if (modeIndex == 1)
         {
-            SetDeleteMode(true);
+            isDeleteMode = true;
+            isMoveMode = false;
             Debug.Log("Mode changed to: DELETE");
+        }
+        else if (modeIndex == 2)
+        {
+            isDeleteMode = false;
+            isMoveMode = true;
+            Debug.Log("Mode changed to: MOVE");
         }
         else
         {
             Debug.LogWarning("Unknown dropdown value: " + modeIndex);
         }
-    }
-
-    // Sets the delete mode flag
-    public void SetDeleteMode(bool value)
-    {
-        isDeleteMode = value;
     }
 }

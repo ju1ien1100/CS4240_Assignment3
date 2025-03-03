@@ -1066,6 +1066,9 @@ MonoBehaviour:
     - m_Text: 'MODE: Delete Furniture'
       m_Image: {fileID: 0}
       m_Color: {r: 1, g: 0.000000061591464, b: 0, a: 0.4745098}
+    - m_Text: 'MODE: Move Furniture'
+      m_Image: {fileID: 0}
+      m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_OnValueChanged:
     m_PersistentCalls:
       m_Calls: []
@@ -2145,7 +2148,6 @@ MonoBehaviour:
   placementIndicator: {fileID: 344609508}
   arRaycastManager: {fileID: 2031934921}
   selectedFurniturePrefab: {fileID: 0}
-  isDeleteMode: 0
   modeDropdown: {fileID: 915000035}
 --- !u!4 &1364729490
 Transform:
