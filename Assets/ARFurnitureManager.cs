@@ -4,6 +4,7 @@ using UnityEngine.XR.ARSubsystems;
 using System.Collections.Generic;
 using UnityEngine.InputSystem;
 using UnityEngine.EventSystems;
+using TMPro; // Added for TMP Dropdown support
 
 public class ARFurnitureManager : MonoBehaviour
 {
@@ -97,7 +98,7 @@ public class ARFurnitureManager : MonoBehaviour
 
         Debug.Log("Tap detected at: " + touchPosition);
 
-        // Check if the tap is over a UI element using our custom function
+        // Check if the tap is over a UI element
         if (IsPointerOverUI(touchPosition))
         {
             Debug.Log("Tap is over UI, ignoring.");
@@ -124,14 +125,6 @@ public class ARFurnitureManager : MonoBehaviour
         };
         List<RaycastResult> raycastResults = new List<RaycastResult>();
         EventSystem.current.RaycastAll(pointerEventData, raycastResults);
-
-        // Optionally, if you only want to ignore objects with a specific tag (e.g., "UI"), you could check:
-        // foreach (RaycastResult result in raycastResults)
-        // {
-        //     if (result.gameObject.CompareTag("UI"))
-        //         return true;
-        // }
-
         return raycastResults.Count > 0;
     }
 
@@ -156,13 +149,34 @@ public class ARFurnitureManager : MonoBehaviour
         Ray ray = Camera.current.ScreenPointToRay(screenPosition);
         if (Physics.Raycast(ray, out RaycastHit hit))
         {
-            if (hit.collider != null && hit.collider.gameObject.CompareTag("Furniture"))
+            Debug.Log("Raycast hit: " + hit.collider.gameObject.name);
+
+            // First, check if the hit object is tagged as "Furniture"
+            GameObject target = hit.collider.gameObject;
+
+            // If not, check if the parent object is tagged as "Furniture"
+            if (!target.CompareTag("Furniture") && target.transform.parent != null)
             {
-                GameObject toRemove = hit.collider.gameObject;
-                placedFurniture.Remove(toRemove);
-                Destroy(toRemove);
-                Debug.Log("Furniture deleted: " + toRemove.name);
+                if (target.transform.parent.CompareTag("Furniture"))
+                {
+                    target = target.transform.parent.gameObject;
+                }
             }
+
+            if (target.CompareTag("Furniture"))
+            {
+                placedFurniture.Remove(target);
+                Destroy(target);
+                Debug.Log("Furniture deleted: " + target.name);
+            }
+            else
+            {
+                Debug.Log("Hit object is not tagged as Furniture.");
+            }
+        }
+        else
+        {
+            Debug.Log("Raycast did not hit any object.");
         }
     }
 
@@ -180,7 +194,29 @@ public class ARFurnitureManager : MonoBehaviour
         }
     }
 
-    // Called by the UI to toggle deletion mode
+    // Called by the UI (TMP Dropdown) to toggle deletion mode
+    // TMP Dropdown option index 0: "MODE: Add", index 1: "MODE: Delete"
+    public void OnModeDropdownValueChanged(int modeIndex)
+    {
+        Debug.Log("Dropdown changed! New mode index: " + modeIndex);
+
+        if (modeIndex == 0)
+        {
+            SetDeleteMode(false);
+            Debug.Log("Mode changed to: ADD");
+        }
+        else if (modeIndex == 1)
+        {
+            SetDeleteMode(true);
+            Debug.Log("Mode changed to: DELETE");
+        }
+        else
+        {
+            Debug.LogWarning("Unknown dropdown value: " + modeIndex);
+        }
+    }
+
+    // Called to set the delete mode flag
     public void SetDeleteMode(bool value)
     {
         isDeleteMode = value;
