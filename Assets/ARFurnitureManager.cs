@@ -77,7 +77,6 @@ public class ARFurnitureManager : MonoBehaviour
         if (isMoveMode && movingObject != null && placementPoseIsValid)
         {
             movingObject.transform.position = placementPose.position;
-            movingObject.transform.rotation = placementPose.rotation;
         }
     }
 
@@ -193,7 +192,9 @@ public class ARFurnitureManager : MonoBehaviour
             Debug.Log("Cannot place furniture: invalid placement pose or no furniture selected.");
             return;
         }
-        GameObject furniture = Instantiate(selectedFurniturePrefab, placementPose.position, placementPose.rotation);
+        // Unity Engine Quaternion.Euler value for -90 rotation around X axis.
+        Quaternion rotation = Quaternion.Euler(-90f, 0f, 0f);
+        GameObject furniture = Instantiate(selectedFurniturePrefab, placementPose.position, rotation);
         furniture.tag = "Furniture"; // Tag the furniture for deletion/movement.
         placedFurniture.Add(furniture);
         Debug.Log("Furniture placed: " + furniture.name);
